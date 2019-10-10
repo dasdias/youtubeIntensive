@@ -58,13 +58,13 @@ document.addEventListener('DOMContentLoaded', () => {
 				else if (target.getAttribute('data-backspace')) {
 					const str = searchInput.value;
 					searchInput.value = str.slice(0, -1);
-				}else if (contentButton === 'en' || contentButton === 'ru') {
+				} else if (contentButton === 'en' || contentButton === 'ru') {
 					changeLang(buttons, contentButton);
 				}
 				// выводим все нажатые буквы кроме backspace
 				else if (!target.getAttribute('data-backspace')) {
 					searchInput.value += contentButton;
-				} 
+				}
 			}
 		};
 
@@ -104,16 +104,9 @@ document.addEventListener('DOMContentLoaded', () => {
 		});
 	}
 
-	// модальное окно
-	{
 
-		document.body.insertAdjacentHTML('beforeend', `
-        <div class="youTuberModal">
-            <div id="youtuberClose">&#215;</div>
-            <div id="youtuberContainer"></div>
-        </div>
-        `);
 
+	const youtuber = () => {
 
 		const youtuberItems = document.querySelectorAll('[data-youtuber]');
 		const youTuberModal = document.querySelector('.youTuberModal');
@@ -169,14 +162,144 @@ document.addEventListener('DOMContentLoaded', () => {
 
 	}
 
+	// модальное окно
+	{
+
+		document.body.insertAdjacentHTML('beforeend', `
+        <div class="youTuberModal">
+            <div id="youtuberClose">&#215;</div>
+            <div id="youtuberContainer"></div>
+        </div>
+        `);
+		youtuber();
+
+	}
+
 	{
 
 		const API_KEY = 'AIzaSyCm5tVFRHULtxeeclgb-EvIZpAHvr5NVFM';
 		const CLIENT_ID = '213640380517-hdggpi65skfqagt43pje27h44s415taf.apps.googleusercontent.com';
 
+		const buttonAuth = document.getElementById('authorize');
+		const authBlock = document.querySelector('.auth');
 
+		const errorAuth = err => {
+			console.error(err);
+			authBlock.style.display = '';
+		};
+
+		gapi.load("client:auth2", () => gapi.auth2.init({
+			client_id: CLIENT_ID
+		}));
+
+		const authenticate = () => gapi.auth2.getAuthInstance()
+			.signIn({
+				scope: "https://www.googleapis.com/auth/youtube.readonly"
+			})
+			.then(() => console.log("Sign-in successful"))
+			.catch(errorAuth);
+
+
+		const loadClient = () => {
+			gapi.client.setApiKey(API_KEY);
+			return gapi.client.load("https://www.googleapis.com/discovery/v1/apis/youtube/v3/rest")
+				.then(() => console.log("GAPI client loaded for API"))
+				.then(() => authBlock.style.display = 'none')
+				.catch(errorAuth);
+		}
+
+
+
+		buttonAuth.addEventListener('click', () => {
+			authenticate().then(loadClient);
+		});
 
 	}
 
+	// request
+	{
+		const gloTube = document.querySelector('.logo-academy');
+		const trends = document.getElementById('yt_trend');
+		const like = document.getElementById('yt_like');
+
+
+		const request = options => gapi.client.youtube[options.method]
+			.list(options)
+			.then(response => response.result.items)
+			.then(render)
+			.then(youtuber)
+			.catch(err => console.error('Во время запроса произошла ошиба ' + err));
+
+		const render = data => {
+			console.log(data);
+
+			const ytWrapper = document.getElementById('yt-wrapper');
+			ytWrapper.textContent = '';
+			data.forEach(item => {
+				try {
+					const {
+						id,
+						id: {
+							videoId
+						},
+						snippet: {
+							channelTitle,
+							title,
+							resourceId: {
+								videoId: likedVideoId
+							} = {},
+							thumbnails: {
+								high: {
+									url
+								}
+							}
+						}
+					} = item;
+
+					ytWrapper.innerHTML += `
+					<div class="yt" data-youtuber = "${likedVideoId || videoId || id}">
+						<div class="yt-thumbnail"	style="--aspect-ratio:16/9;">
+							<img src="${url}"	alt="thumbnail" class="yt-thumbnail__img">
+						</div>
+						<div class="yt-title">${title}</div>
+						<div class="yt-channel">${channelTitle}</div>
+					</div>
+					`;
+				} catch (err) {
+					console.error(err);
+				}
+			});
+
+		};
+
+		gloTube.addEventListener('click', () => {
+			request({
+				method: 'search',
+				part: 'snippet',
+				channelId: 'UCVswRUcKC-M35RzgPRv8qUg',
+				order: 'date',
+				maxResults: 6,
+			});
+		});
+
+		trends.addEventListener('click', () => {
+			request({
+				method: 'videos',
+				part: "snippet",
+				chart: "mostPopular",
+				maxResults: 6,
+				regionCode: "RU",
+			});
+		});
+
+		like.addEventListener('click', () => {
+			request({
+				method: 'playlistItems',
+				part: "snippet",
+				playlistId: 'LLMFKm3Uf3dHIJjOY8jDXORQ',
+				maxResults: 6,
+			});
+		});
+	}
 
 });
