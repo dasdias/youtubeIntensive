@@ -7,8 +7,6 @@ document.addEventListener('DOMContentLoaded', () => {
 		let keyboard = document.querySelector('.keyboard');
 		let closeKeyboard = document.getElementById('close-keyboard');
 		let searchInput = document.querySelector('.search-form__input');
-		// console.log(keyboard);
-		// console.log(searchInput);
 
 		// функция показывающая меню
 		const toggleKeyboard = () => {
@@ -208,9 +206,13 @@ document.addEventListener('DOMContentLoaded', () => {
 				.catch(errorAuth);
 		}
 
+		// authBlock.addEventListener('click' , () => {
+		// 	console.log(event.target);
+		// 	authBlock.style.display = 'none';
+		// })
 
-
-		buttonAuth.addEventListener('click', () => {
+		buttonAuth.addEventListener('click', (event) => {
+			// event.stopPropagation();
 			authenticate().then(loadClient);
 		});
 
@@ -221,17 +223,70 @@ document.addEventListener('DOMContentLoaded', () => {
 		const gloTube = document.querySelector('.logo-academy');
 		const trends = document.getElementById('yt_trend');
 		const like = document.getElementById('yt_like');
+		const searchForm = document.querySelector('.search-form');
+		const subscriptions = document.getElementById('subscriptions');
 
 
 		const request = options => gapi.client.youtube[options.method]
 			.list(options)
 			.then(response => response.result.items)
-			.then(render)
-			.then(youtuber)
+			.then(data => options.method === 'subscriptions' ? renderSub(data) : render(data))
+			// .then(youtuber)
 			.catch(err => console.error('Во время запроса произошла ошиба ' + err));
 
-		const render = data => {
+		const renderSub = data => {
 			console.log(data);
+
+			const ytWrapper = document.getElementById('yt-wrapper');
+			ytWrapper.textContent = '';
+			data.forEach(item => {
+				try {
+					const {
+						snippet: {
+							resourceId: {
+								channelId
+							},
+							description,
+							title,
+							thumbnails: {
+								high: {
+									url
+								}
+							},
+						}
+					} = item;
+
+					ytWrapper.innerHTML += `
+					<div class="yt" data-youtuber = "${channelId}">
+						<div class="yt-thumbnail"	style="--aspect-ratio:16/9;">
+							<img src="${url}"	alt="thumbnail" class="yt-thumbnail__img">
+						</div>
+						<div class="yt-title">${title}</div>
+						<div class="yt-channel">${description}</div>
+					</div>
+					`;
+				} catch (err) {
+					console.error(err);
+				}
+			});
+
+			ytWrapper.querySelectorAll('.yt').forEach(item => {
+				item.addEventListener('click', () => {
+					request({
+						method: 'search',
+						part: 'snippet',
+						channelId: item.dataset.youtuber,
+						order: 'date',
+						maxResults: 6,
+					});
+				});
+			});
+
+
+		};
+
+		const render = data => {
+			// console.log(data);
 
 			const ytWrapper = document.getElementById('yt-wrapper');
 			ytWrapper.textContent = '';
@@ -270,6 +325,7 @@ document.addEventListener('DOMContentLoaded', () => {
 				}
 			});
 
+			youtuber();
 		};
 
 		gloTube.addEventListener('click', () => {
@@ -299,6 +355,34 @@ document.addEventListener('DOMContentLoaded', () => {
 				playlistId: 'LLMFKm3Uf3dHIJjOY8jDXORQ',
 				maxResults: 6,
 			});
+		});
+
+		subscriptions.addEventListener('click', () => {
+			request({
+				method: 'subscriptions',
+				part: "snippet",
+				mine: true,
+				maxResults: 6,
+			});
+		});
+
+		searchForm.addEventListener('submit', event => {
+			// console.log(searchForm);
+			event.preventDefault();
+			const valueInput = searchForm.elements[0].value;
+			if (!valueInput) {
+				searchForm.style.border = '1px solid red';
+				return;
+			}
+			searchForm.style.border = '';
+			request({
+				method: 'search',
+				part: 'snippet',
+				order: 'relevance',
+				maxResults: 6,
+				q: searchForm.elements[0].value,
+			});
+
 		});
 	}
 
